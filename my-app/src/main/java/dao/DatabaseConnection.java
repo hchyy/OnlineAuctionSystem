@@ -1,40 +1,45 @@
 package dao;
 
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Properties;
 
 public class DatabaseConnection {
-
-    // 1. Biến tĩnh lưu trữ instance duy nhất
     private static DatabaseConnection instance;
     private Connection connection;
 
-    // 2. Cấu hình thông tin Database
-    // (Lưu ý: Thay đổi port 3306 và password cho khớp với máy của bạn)
-    private static final String URL = "jdbc:mysql://localhost:3306/auction_db";
-    private static final String USERNAME = "root";
-    private static final String PASSWORD = "123456";
-
-    // 3. Constructor private để ngăn chặn khởi tạo từ bên ngoài bằng từ khóa 'new'
     private DatabaseConnection() {
         try {
-            // Nạp MySQL JDBC Driver
+            // Đọc file cấu hình
+            Properties props = new Properties();
+            InputStream is = getClass().getClassLoader().getResourceAsStream("database.properties");
+
+            if (is == null) {
+                System.err.println("Lỗi: Không tìm thấy file database.properties trong thư mục resources!");
+                return;
+            }
+            props.load(is);
+
+            // Lấy thông tin từ file
+            String url = props.getProperty("db.url");
+            String username = props.getProperty("db.username");
+            String password = props.getProperty("db.password");
+
+            // Khởi tạo kết nối
             Class.forName("com.mysql.cj.jdbc.Driver");
-            this.connection = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+            this.connection = DriverManager.getConnection(url, username, password);
             System.out.println("Kết nối Database thành công!");
-        } catch (ClassNotFoundException e) {
-            System.err.println("Lỗi: Không tìm thấy JDBC Driver. Hãy kiểm tra lại file pom.xml.");
-        } catch (SQLException e) {
-            System.err.println("Lỗi kết nối MySQL: " + e.getMessage());
+
+        } catch (Exception e) {
+            System.err.println("Lỗi khởi tạo kết nối Database: " + e.getMessage());
         }
     }
 
-    // 4. Cung cấp điểm truy cập toàn cục (Thread-safe)
     public static synchronized DatabaseConnection getInstance() {
         try {
-            // Kiểm tra nếu instance chưa được tạo, hoặc kết nối đã bị đóng ngắt quãng
-            if (instance == null || instance.getConnection().isClosed()) {
+            if (instance == null || (instance.getConnection() != null && instance.getConnection().isClosed())) {
                 instance = new DatabaseConnection();
             }
         } catch (SQLException e) {
@@ -43,7 +48,6 @@ public class DatabaseConnection {
         return instance;
     }
 
-    // 5. Hàm getter để các lớp DAO lấy Connection
     public Connection getConnection() {
         return connection;
     }
